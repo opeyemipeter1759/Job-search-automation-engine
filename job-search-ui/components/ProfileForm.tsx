@@ -69,11 +69,17 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
     setProfile(p => ({ ...p, [key]: val }));
   }
 
-  function handleSearch() {
-    if (profile.topSkills.length === 0) return alert("Add at least one skill.");
-    if (sources.length === 0) return alert("Select at least one source.");
-    onSearch(profile, sources);
-  }
+//   function handleSearch() {
+//     if (profile.topSkills.length === 0) return alert("Add at least one skill.");
+//     if (sources.length === 0) return alert("Select at least one source.");
+//     onSearch(profile, sources);
+//   }
+    
+    function handleSearch() {
+  if (profile.topSkills.length === 0) return alert("Add at least one skill.");
+  if (sources.length === 0) return alert("Select at least one source.");
+  onSearch(profile, sources);
+}
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-5 space-y-5">
@@ -121,7 +127,22 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
       {/* Dealbreakers */}
       <TagInput label="Dealbreakers" placeholder="e.g. unpaid trial, commission only, on-site Lagos…"
 
-        tags={profile.dealbreakers} onChange={v => set("dealbreakers", v)} />
+              tags={profile.dealbreakers} onChange={v => set( "dealbreakers", v )} />
+          
+  {/* Location */}
+          <div className="space-y-1.5">
+  <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+    Preferred location
+  </label>
+  <input
+    className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-zinc-400 dark:focus:border-zinc-500 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+    placeholder="e.g. London, New York, Nigeria — leave blank for anywhere"
+    value={profile.preferredLocations[0] ?? ""}
+    onChange={(e) =>
+      set("preferredLocations", e.target.value ? [e.target.value] : [])
+    }
+  />
+</div>
 
       {/* Remote toggle */}
       <label className="flex items-center gap-3 cursor-pointer">
@@ -134,6 +155,9 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
           <p className="text-xs text-zinc-400">Filter out non-remote listings</p>
         </div>
       </label>
+          
+        
+
 
       {/* Sources */}
       <div className="space-y-1.5">

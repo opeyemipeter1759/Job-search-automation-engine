@@ -27,9 +27,17 @@ export interface RawListing {
   salary?: string;
 }
 
+export interface ScoreBreakdown {
+  skillsMatch: string;
+  experienceMatch: string;
+  locationMatch: string;
+  roleMatch: string;
+}
+
 export interface ScoredListing extends RawListing {
   score: number;
-  rationale: string;
+    rationale: string;
+    breakdown?: ScoreBreakdown;
   recommendation: Recommendation;
   confidence: Confidence;
   corrected?: boolean;

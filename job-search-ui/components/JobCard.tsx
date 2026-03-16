@@ -4,19 +4,34 @@ import { ScoredListing } from "@/types";
 import { ScoreBadge } from "./ScoreBadge";
 import { getRecBadge, SOURCE_META, formatTimeAgo } from "@/lib/utils";
 
+function BreakdownRow({ label, text, icon }: { label: string; text: string; icon: string }) {
+  return (
+    <div className="flex gap-2.5 text-xs">
+      <span className="flex-shrink-0 w-4 text-center">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <span className="font-medium text-zinc-700 dark:text-zinc-300">{label}: </span>
+        <span className="text-zinc-500 dark:text-zinc-400">{text}</span>
+      </div>
+    </div>
+  );
+}
+
 export function JobCard({ job, rank }: { job: ScoredListing; rank: number }) {
   const [open, setOpen] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const src = SOURCE_META[job.source];
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl overflow-hidden hover:border-zinc-200 dark:hover:border-zinc-700 transition-colors">
       <div className="p-4 flex gap-3">
-        <div className="flex flex-col items-center gap-1 pt-0.5">
+        {/* Rank + Score */}
+        <div className="flex flex-col items-center gap-1 pt-0.5 flex-shrink-0">
           <span className="text-[10px] tabular-nums text-zinc-300 dark:text-zinc-600 font-medium">#{rank}</span>
           <ScoreBadge score={job.score} />
         </div>
 
         <div className="flex-1 min-w-0">
+          {/* Title + recommendation */}
           <div className="flex items-start gap-2 justify-between">
             <div>
               <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm leading-snug">{job.title}</h3>
@@ -27,16 +42,15 @@ export function JobCard({ job, rank }: { job: ScoredListing; rank: number }) {
             </span>
           </div>
 
+          {/* Meta */}
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${src.color}`}>{src.label}</span>
-
             <span className="text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               </svg>
               {job.location}
             </span>
-
             {job.remote && (
               <span className="text-xs bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full font-medium">Remote</span>
             )}
@@ -46,8 +60,46 @@ export function JobCard({ job, rank }: { job: ScoredListing; rank: number }) {
             <span className="text-xs text-zinc-400 dark:text-zinc-500 ml-auto">{formatTimeAgo(job.postedAt)}</span>
           </div>
 
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-2">{job.rationale}</p>
+          {/* Rationale — always visible */}
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+            {job.rationale}
+          </p>
 
+          {/* Score breakdown — toggle */}
+          {job.breakdown && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowBreakdown(!showBreakdown)}
+                className="text-[11px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors flex items-center gap-1 font-medium"
+              >
+                <svg className={`w-3 h-3 transition-transform ${showBreakdown ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                {showBreakdown ? "Hide score breakdown" : "Why this score?"}
+              </button>
+
+              {showBreakdown && (
+                <div className="mt-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2 border border-zinc-100 dark:border-zinc-700">
+                  <p className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1">Score breakdown</p>
+                  <BreakdownRow label="Skills" text={job.breakdown.skillsMatch} icon="🛠" />
+                  <BreakdownRow label="Experience" text={job.breakdown.experienceMatch} icon="📅" />
+                  <BreakdownRow label="Location" text={job.breakdown.locationMatch} icon="📍" />
+                  <BreakdownRow label="Role fit" text={job.breakdown.roleMatch} icon="🎯" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Skills chips */}
+          {job.skills && job.skills.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {job.skills.map((s) => (
+                <span key={s} className="text-[11px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md font-medium">{s}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Corrected flag */}
           {job.corrected && (
             <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,20 +109,14 @@ export function JobCard({ job, rank }: { job: ScoredListing; rank: number }) {
             </p>
           )}
 
-          {job.skills && job.skills.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {job.skills.map(s => (
-                <span key={s} className="text-[11px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md font-medium">{s}</span>
-              ))}
-            </div>
-          )}
-
+          {/* Full description */}
           {open && (
             <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed border-t border-zinc-100 dark:border-zinc-800 pt-3">{job.description}</p>
           )}
         </div>
       </div>
 
+      {/* Footer */}
       <div className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
         <button onClick={() => setOpen(!open)}
           className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors flex items-center gap-1">

@@ -25,11 +25,16 @@ export default function Home() {
     const stepTimer = setTimeout(() => setStep("scoring"), 1500);
 
     try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, sources }),
-      });
+    const res = await fetch("/api/search", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    profile,
+    sources,
+    location: profile.preferredLocations[0] ?? "",
+    remoteOnly: profile.remoteOnly,
+  }),
+});
 
       clearTimeout(stepTimer);
 

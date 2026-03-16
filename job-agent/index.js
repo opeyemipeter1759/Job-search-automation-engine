@@ -26,12 +26,14 @@ Always respond with ONLY a valid JSON object with exactly these fields:
 
 async function main()
 {
-    console.log( "🔍 Fetching Upwork listings...\n" );
+    // Change these to test different scenarios
+    const keyword = process.argv[2] ?? "product manager";
+    const remoteOnly = process.argv[3] === "--remote";
+    const location = process.argv[4] ?? "";
 
-    //const listings = await fetchUpworkJobs( "Node.js developer" );
-    //const listings = await fetchUpworkJobs( "node" );
-    const listings = await fetchUpworkJobs( "product manager" );
-    // or: "designer", "marketing", "data analyst", "finance", "customer support"
+    console.log( "🚀 Job Search Agent starting..." );
+
+    const listings = await fetchUpworkJobs( keyword, { remoteOnly, location } );
 
     if ( listings.length === 0 )
     {
@@ -39,22 +41,26 @@ async function main()
         return;
     }
 
-    console.log( `Found ${ listings.length } listings. Scoring first 5...\n` );
+    console.log( `Scoring first 5 of ${ listings.length } listings...\n` );
 
     for ( const listing of listings.slice( 0, 5 ) )
     {
-        console.log( `📋 ${ listing.title }` );
+        console.log( `📋 ${ listing.title } — ${ listing.company }` );
+        console.log( `   📍 ${ listing.location } | 🌍 Remote: ${ listing.remote }` );
+        console.log( `   Source: ${ listing.source }` );
+        if ( listing.salary ) console.log( `   💰 ${ listing.salary }` );
+
         try
         {
             const analysis = await analyseJob( listing );
             console.log( `   Score: ${ analysis.fitScore }/100` );
             console.log( `   Skills: ${ analysis.skills.join( ", " ) }` );
-            console.log( `   → ${ analysis.recommendation.toUpperCase() }\n` );
+            console.log( `   → ${ analysis.recommendation.toUpperCase() }` );
         } catch ( err )
         {
-            console.log( `   ⚠️ Scoring failed: ${ err.message }\n` );
+            console.log( `   ⚠️  Scoring failed: ${ err.message }` );
         }
+        console.log( "" );
     }
 }
-
 main();
