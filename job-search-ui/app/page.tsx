@@ -65,7 +65,7 @@ export default function Home() {
             </div>
             <div>
               <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Job Search Agent</span>
-              <span className="ml-2 text-xs text-zinc-400">powered by Gemini</span>
+              {/* <span className="ml-2 text-xs text-zinc-400">powered by Gemini</span> */}
             </div>
           </div>
 
@@ -91,7 +91,7 @@ export default function Home() {
               Find your next role,<br />automatically.
             </h1>
             <p className="mt-2 text-zinc-400 text-sm max-w-md mx-auto">
-              Enter your skills below. The agent scrapes LinkedIn, Upwork, Wellfound, Jobberman, and MyJobMag — then scores every listing against your profile using Gemini AI.
+Enter your skills and the role you are looking for. The agent searches across multiple job boards and scores every listing against your profile using Gemini AI.
             </p>
           </div>
         )}

@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SkillsProfile, ScoredListing, Source } from "@/types";
 
-// ─────────────────────────────────────────────────────────────
-// This route is the bridge between the Next.js UI and your
-// Node.js agents. It calls your agent functions directly
-// (monorepo) or via HTTP if you expose them as an Express server.
-//
-// For the sprint, we call the Gemini API directly from here
-// so the UI works even before all agents are built.
-// ─────────────────────────────────────────────────────────────
-
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
@@ -28,23 +19,104 @@ async function callGemini(prompt: string, systemInstruction: string): Promise<st
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 }
 
-// Mock scraper — replace with your real agent imports once built
-function getMockListings(keywords: string[], sources: Source[]): ScoredListing[] {
-  const pool = [
-    { id: "1", title: "Senior Node.js Engineer", company: "Flutterwave", location: "Lagos · Remote", url: "https://flutterwave.com/careers", source: "linkedin" as Source, description: "Build payment APIs serving millions of transactions. Own backend services end-to-end. Node.js, PostgreSQL, AWS, REST APIs required.", postedAt: new Date(Date.now() - 86400000).toISOString(), remote: true, salary: "$60k–$90k" },
-    { id: "2", title: "Backend Engineer", company: "Paystack", location: "Lagos", url: "https://paystack.com/careers", source: "wellfound" as Source, description: "Scale Paystack's core API infrastructure. Work with Node.js, TypeScript, Redis, and PostgreSQL on high-throughput systems.", postedAt: new Date(Date.now() - 172800000).toISOString(), remote: false },
-    { id: "3", title: "Node.js API Developer", company: "Remote Startup", location: "Remote · Worldwide", url: "https://upwork.com/jobs/mock1", source: "upwork" as Source, description: "Part-time 20hrs/week. Build REST APIs for a SaaS platform. Node.js, Express, PostgreSQL. Senior level, must work independently.", postedAt: new Date(Date.now() - 43200000).toISOString(), remote: true },
-    { id: "4", title: "Full Stack Developer", company: "Andela", location: "Remote · Africa", url: "https://andela.com/talent", source: "jobberman" as Source, description: "Contract roles with global companies. React, Node.js, TypeScript. 6-month initial engagement, renewable.", postedAt: new Date(Date.now() - 259200000).toISOString(), remote: true },
-    { id: "5", title: "Software Engineer II", company: "Kuda Bank", location: "Lagos", url: "https://kuda.com/careers", source: "linkedin" as Source, description: "Scale Kuda's banking infrastructure for 6M+ customers. Microservices, Node.js, AWS, Redis. High-throughput transaction systems.", postedAt: new Date(Date.now() - 345600000).toISOString(), remote: false },
-    { id: "6", title: "Backend Engineer (Fintech)", company: "Mono", location: "Remote · Nigeria", url: "https://mono.co/careers", source: "wellfound" as Source, description: "Build financial data APIs. Node.js, Express, MongoDB. Experience with open banking APIs a strong plus.", postedAt: new Date(Date.now() - 21600000).toISOString(), remote: true },
-    { id: "7", title: "API Integration Engineer", company: "Global Client", location: "Remote", url: "https://upwork.com/jobs/mock2", source: "upwork" as Source, description: "One-time project, 3 months. Integrate payment gateway APIs into existing Node.js backend. $50/hr budget.", postedAt: new Date(Date.now() - 7200000).toISOString(), remote: true, salary: "$50/hr" },
-    { id: "8", title: "Junior Node.js Developer", company: "Local Agency", location: "Lagos", url: "https://jobberman.com/mock1", source: "jobberman" as Source, description: "2 years experience required. Build web applications using Node.js and React. On-site only. Entry level salary.", postedAt: new Date(Date.now() - 432000000).toISOString(), remote: false },
-  ];
+// ── Real scraper using Arbeitnow free API ──
+async function fetchRealJobs(keyword: string) {
+  const [arbeitnow, remotive, muse] = await Promise.all([
+    fetchArbeitnow(keyword),
+    fetchRemotive(keyword),
+    fetchTheMuse(keyword),
+  ]);
 
-  return pool
-    .filter((l) => sources.includes(l.source))
-    .map((l) => ({ ...l, score: 0, rationale: "", recommendation: "skip" as const, confidence: "medium" as const, skills: [] }));
+  const combined = [...arbeitnow, ...remotive, ...muse];
+
+  // Deduplicate by title+company
+  const seen = new Set<string>();
+  return combined.filter((job) => {
+    const key = `${job.title.toLowerCase()}-${job.company.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
+
+async function fetchArbeitnow(keyword: string) {
+  try {
+    const res = await fetch("https://www.arbeitnow.com/api/job-board-api", {
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    const json = await res.json();
+    const kw = keyword.toLowerCase();
+    return (json.data ?? [])
+      .filter((job: any) => `${job.title} ${job.description} ${job.tags?.join(" ")}`.toLowerCase().includes(kw))
+      .map((job: any, i: number) => ({
+        id: `arbeitnow-${job.slug ?? i}`,
+        title: job.title ?? "No title",
+        description: (job.description ?? "").replace(/<[^>]+>/g, "").slice(0, 500).trim(),
+        url: job.url ?? "https://arbeitnow.com",
+        postedAt: job.created_at ? new Date(job.created_at * 1000).toISOString() : new Date().toISOString(),
+        company: job.company_name ?? "Unknown",
+        location: job.location ?? "Remote",
+        source: "upwork" as Source,
+        remote: job.remote ?? true,
+      }));
+  } catch { return []; }
+}
+
+async function fetchRemotive(keyword: string) {
+  try {
+    const res = await fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(keyword)}&limit=20`, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    const json = await res.json();
+    return (json.jobs ?? []).map((job: any, i: number) => ({
+      id: `remotive-${job.id ?? i}`,
+      title: job.title ?? "No title",
+      description: (job.description ?? "").replace(/<[^>]+>/g, "").slice(0, 500).trim(),
+      url: job.url ?? "https://remotive.com",
+      postedAt: job.publication_date ?? new Date().toISOString(),
+      company: job.company_name ?? "Unknown",
+      location: job.candidate_required_location || "Remote",
+      source: "wellfound" as Source,
+      remote: true,
+      salary: job.salary || undefined,
+    }));
+  } catch { return []; }
+}
+
+async function fetchTheMuse(keyword: string) {
+  try {
+    const res = await fetch(`https://www.themuse.com/api/public/jobs?query=${encodeURIComponent(keyword)}&page=1&descending=true`, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    const json = await res.json();
+    return (json.results ?? []).map((job: any, i: number) => ({
+      id: `muse-${job.id ?? i}`,
+      title: job.name ?? "No title",
+      description: (job.contents ?? "").replace(/<[^>]+>/g, "").slice(0, 500).trim(),
+      url: job.refs?.landing_page ?? "https://themuse.com",
+      postedAt: job.publication_date ?? new Date().toISOString(),
+      company: job.company?.name ?? "Unknown",
+      location: job.locations?.[0]?.name ?? "Remote",
+      source: "linkedin" as Source,
+      remote: job.locations?.[0]?.name?.toLowerCase().includes("remote") ?? false,
+    }));
+  } catch { return []; }
+}
+// ```
+
+// ---
+
+// ## Test keywords that work across all three sources
+// ```
+// "product manager"
+// "data analyst"
+// "designer"
+// "marketing"
+// "customer success"
+// "finance"
+// "devops"
+// "react"
+// "python"
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -54,13 +126,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GEMINI_API_KEY not set in .env.local" }, { status: 500 });
   }
 
-  // 1. Scrape / get listings (mock for now, swap your real scrapers in)
-  const listings = getMockListings(profile.keywords, sources.length ? sources : ["upwork", "linkedin", "wellfound", "jobberman", "myjobmag"]);
+  // 1. Fetch real listings — use first keyword from profile
+  const keyword = profile.keywords[0] ?? "javascript";
+  const listings = await fetchRealJobs(keyword);
+
+  // Fallback to mock if API returns nothing
+  const finalListings = listings.length > 0 ? listings.slice(0, 10) : getMockListings();
 
   // 2. Score each listing with Gemini
   const scored: ScoredListing[] = [];
 
-  for (const listing of listings) {
+  for (const listing of finalListings) {
     try {
       const raw = await callGemini(
         `Score this job listing for this candidate profile.
@@ -80,7 +156,7 @@ Description: ${listing.description}
 Remote: ${listing.remote ?? false}`,
         `You are a job matching assistant. Analyse job listings for a candidate and return ONLY a JSON object with:
 - score: number 0-100 (fit score)
-- rationale: string (2 sentences explaining the score)  
+- rationale: string (2 sentences explaining the score)
 - recommendation: "apply" | "borderline" | "skip"
 - confidence: "high" | "medium" | "low"
 - skills: string[] (up to 5 key skills mentioned in the listing)
@@ -90,7 +166,7 @@ Remote: ${listing.remote ?? false}`,
       const parsed = JSON.parse(raw);
       scored.push({ ...listing, ...parsed });
     } catch {
-      scored.push({ ...listing, score: 0, rationale: "Scoring failed.", recommendation: "skip", confidence: "low", skills: [] });
+      scored.push({ ...listing, score: 0, rationale: "Scoring failed.", recommendation: "skip", confidence: "low", skills: [], corrected: false });
     }
   }
 
@@ -100,14 +176,19 @@ Remote: ${listing.remote ?? false}`,
     .filter((l) => !(profile.remoteOnly && !l.remote));
 
   const stats = {
-    scanned: listings.length,
-    scored: scored.length,
-    passed: sorted.filter((l) => l.score >= 65).length,
-    sources: sources.reduce((acc, s) => {
-      acc[s] = listings.filter((l) => l.source === s).length;
-      return acc;
-    }, {} as Record<Source, number>),
+    scanned: finalListings.length,
+      scored: scored.length,
+      passed: sorted.filter((l) => l.score >= 65).length,
+    sources: { arbeitnow: finalListings.length },
   };
 
   return NextResponse.json({ results: sorted, stats });
 }
+
+// Fallback mock data if API is unreachable
+function getMockListings() {
+  return [
+    { id: "m1", title: "Senior Node.js Engineer", company: "Flutterwave", location: "Remote", url: "https://flutterwave.com/careers", source: "upwork" as Source, description: "Build payment APIs with Node.js, PostgreSQL, REST. 4+ years experience required.", postedAt: new Date().toISOString(), remote: true },
+    { id: "m2", title: "Backend API Developer", company: "Remote Client", location: "Remote", url: "https://arbeitnow.com", source: "upwork" as Source, description: "Node.js REST API development for SaaS platform. TypeScript, Express, PostgreSQL.", postedAt: new Date().toISOString(), remote: true },
+  ];
+}  

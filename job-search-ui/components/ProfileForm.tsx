@@ -94,7 +94,7 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
       </div>
 
       {/* Skills */}
-      <TagInput label="Top skills *" placeholder="e.g. Node.js, PostgreSQL, REST APIs…"
+      <TagInput label="Top skills *" placeholder="e.g. Project Management, Excel, Python, Copywriting…"
         tags={profile.topSkills} onChange={v => set("topSkills", v)} />
 
       {/* Years experience */}
@@ -109,15 +109,18 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
       </div>
 
       {/* Preferred roles */}
-      <TagInput label="Preferred roles" placeholder="e.g. Backend Engineer, Fullstack Developer…"
+      <TagInput label="Preferred roles" placeholder="e.g. Product Manager, Data Analyst, UX Designer, Marketer…"
+
         tags={profile.preferredRoles} onChange={v => set("preferredRoles", v)} />
 
       {/* Keywords for search */}
-      <TagInput label="Search keywords *" placeholder="e.g. Node.js developer, backend engineer…"
+      <TagInput label="Search keywords *" placeholder="e.g. product manager, graphic designer, data analyst, finance…"
+
         tags={profile.keywords} onChange={v => set("keywords", v)} />
 
       {/* Dealbreakers */}
       <TagInput label="Dealbreakers" placeholder="e.g. unpaid trial, commission only, on-site Lagos…"
+
         tags={profile.dealbreakers} onChange={v => set("dealbreakers", v)} />
 
       {/* Remote toggle */}
