@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { SkillsProfile, Source } from "@/types";
 import { SOURCE_META } from "@/lib/utils";
+import { ResumeUpload } from "./ResumeUpload";
+import { ParsedResume } from "@/types";
 
 const DEFAULT_PROFILE: SkillsProfile = {
   name: "",
@@ -61,6 +63,18 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
   const [profile, setProfile] = useState<SkillsProfile>(DEFAULT_PROFILE);
   const [sources, setSources] = useState<Source[]>(ALL_SOURCES);
 
+    function handleResumeParsed(parsed: ParsedResume) {
+  setProfile({
+    name: parsed.name || "",
+    topSkills: parsed.topSkills || [],
+    yearsExperience: parsed.yearsExperience || 3,
+    preferredRoles: parsed.preferredRoles || [],
+    preferredLocations: [],
+    remoteOnly: false,
+    dealbreakers: [],
+    keywords: parsed.keywords || [],
+  });
+}
   function toggleSource(s: Source) {
     setSources(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   }
@@ -86,7 +100,17 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
       <div>
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Your profile</h2>
         <p className="text-xs text-zinc-400 mt-0.5">The agent scores every listing against this.</p>
-      </div>
+          </div>
+          
+          {/* Resume upload */}
+<ResumeUpload onParsed={handleResumeParsed} />
+
+{/* Divider */}
+<div className="flex items-center gap-3">
+  <div className="flex-1 h-px bg-zinc-100 dark:bg-zinc-800" />
+  <span className="text-xs text-zinc-400">or fill in manually</span>
+  <div className="flex-1 h-px bg-zinc-100 dark:bg-zinc-800" />
+</div>
 
       {/* Name */}
       <div className="space-y-1.5">

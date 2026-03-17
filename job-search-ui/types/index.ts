@@ -61,3 +61,13 @@ export interface SearchState {
   };
   error?: string;
 }
+
+export interface ParsedResume {
+  name: string;
+  topSkills: string[];
+  yearsExperience: number;
+  preferredRoles: string[];
+  summary: string;
+  dealbreakers: string[];
+  keywords: string[];
+}
