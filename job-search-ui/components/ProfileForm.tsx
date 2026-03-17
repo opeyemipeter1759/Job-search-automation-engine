@@ -14,7 +14,7 @@ const DEFAULT_PROFILE: SkillsProfile = {
   keywords: [],
 };
 
-const ALL_SOURCES = Object.keys(SOURCE_META) as Source[];
+const ALL_SOURCES: Source[] = ["adzuna", "reed", "jooble", "greenhouse", "remotive"];
 
 interface ProfileFormProps {
   onSearch: (profile: SkillsProfile, sources: Source[]) => void;
@@ -160,16 +160,42 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
 
 
       {/* Sources */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Sources to scan</label>
-        <div className="flex flex-wrap gap-2">
-          {ALL_SOURCES.map(s => {
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+          Sources to scan
+        </label>
+        <div className="space-y-2">
+          {ALL_SOURCES.map((s) => {
             const active = sources.includes(s);
+            const meta = SOURCE_META[s];
             return (
-              <button key={s} onClick={() => toggleSource(s)}
-                className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors ${active ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-900 dark:border-zinc-100" : "bg-white dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400"}`}>
-                {SOURCE_META[s].label}
-              </button>
+              <div
+                key={s}
+                onClick={() => toggleSource(s)}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                  active
+                    ? `${meta.bg} border-current ${meta.color}`
+                    : "border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 opacity-50"
+                }`}
+              >
+                <div>
+                  <p className={`text-xs font-semibold ${active ? meta.color : "text-zinc-500 dark:text-zinc-400"}`}>
+                    {meta.label}
+                  </p>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{meta.description}</p>
+                </div>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                  active
+                    ? "border-zinc-900 dark:border-zinc-100 bg-zinc-900 dark:bg-zinc-100"
+                    : "border-zinc-300 dark:border-zinc-600"
+                }`}>
+                  {active && (
+                    <svg className="w-2.5 h-2.5 text-white dark:text-zinc-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>

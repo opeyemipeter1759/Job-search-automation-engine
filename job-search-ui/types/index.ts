@@ -1,6 +1,7 @@
 export type Recommendation = "apply" | "borderline" | "skip";
 export type Confidence = "high" | "medium" | "low";
-export type Source = "upwork" | "linkedin" | "wellfound" | "jobberman" | "myjobmag";
+export type Source = "adzuna" | "reed" | "jooble" | "greenhouse" | "remotive" | "arbeitnow" | "themuse" | "workingnomads";
+
 
 export interface SkillsProfile {
   name: string;

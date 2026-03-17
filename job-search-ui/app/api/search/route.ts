@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { SkillsProfile, ScoredListing, Source } from "@/types";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const ADZUNA_APP_ID = process.env.ADZUNA_APP_ID!;
+const ADZUNA_APP_KEY = process.env.ADZUNA_APP_KEY!;
+const REED_API_KEY = process.env.REED_API_KEY!;
+const JOOBLE_API_KEY = process.env.JOOBLE_API_KEY!;
 
 async function callGemini(prompt: string, systemInstruction: string): Promise<string> {
   const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
@@ -19,41 +22,158 @@ async function callGemini(prompt: string, systemInstruction: string): Promise<st
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 }
 
-// ── Scrapers ──────────────────────────────────────────────────
-
-async function fetchArbeitnow(keyword: string, remoteOnly: boolean, location: string) {
+// ── Adzuna ────────────────────────────────────────────────────
+async function fetchAdzuna(keyword: string, location: string, remoteOnly: boolean) {
   try {
-    let url = "https://www.arbeitnow.com/api/job-board-api";
-    if (remoteOnly) url += "?remote=true";
+    const country = location.toLowerCase().includes("nigeria") ||
+      location.toLowerCase().includes("lagos") ? "ng" : "gb";
+    const loc = location || "london";
+    let url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${ADZUNA_APP_ID}&app_key=${ADZUNA_APP_KEY}&results_per_page=20&what=${encodeURIComponent(keyword)}&where=${encodeURIComponent(loc)}&content-type=application/json`;
+    if (remoteOnly) url += "&title_only=remote";
+
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     const json = await res.json();
-    const kw = keyword.toLowerCase();
-    return (json.data ?? [])
-      .filter((job: any) => {
-        const text = `${job.title} ${job.description} ${job.tags?.join(" ")}`.toLowerCase();
-        if (!text.includes(kw)) return false;
-        if (location && !job.location?.toLowerCase().includes(location.toLowerCase())) return false;
-        return true;
-      })
-      .map((job: any, i: number) => ({
-        id: `arbeitnow-${job.slug ?? i}`,
-        title: job.title ?? "No title",
-        description: (job.description ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
-        url: job.url ?? "https://arbeitnow.com",
-        postedAt: job.created_at ? new Date(job.created_at * 1000).toISOString() : new Date().toISOString(),
-        company: job.company_name ?? "Unknown",
-        location: job.location ?? "Remote",
-        source: "upwork" as Source,
-        remote: job.remote ?? false,
-        salary: job.salary ?? undefined,
-      }));
-  } catch { return []; }
+
+    return (json.results ?? []).map((job: any, i: number) => ({
+      id: `adzuna-${job.id ?? i}`,
+      title: job.title ?? "No title",
+      description: (job.description ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
+      url: job.redirect_url ?? "https://adzuna.com",
+      postedAt: job.created ?? new Date().toISOString(),
+      company: job.company?.display_name ?? "Unknown",
+      location: job.location?.display_name ?? location,
+      source: "adzuna" as Source,
+      remote: job.title?.toLowerCase().includes("remote") || job.description?.toLowerCase().includes("remote") || false,
+      salary: job.salary_min ? `£${Math.round(job.salary_min / 1000)}k–£${Math.round(job.salary_max / 1000)}k` : undefined,
+    }));
+  } catch (err: any) {
+    console.error("❌ Adzuna failed:", err.message);
+    return [];
+  }
 }
 
+// ── Reed ─────────────────────────────────────────────────────
+async function fetchReed(keyword: string, location: string, remoteOnly: boolean) {
+  try {
+    let url = `https://www.reed.co.uk/api/1.0/search?keywords=${encodeURIComponent(keyword)}&resultsToTake=20`;
+    if (location) url += `&locationName=${encodeURIComponent(location)}`;
+    if (remoteOnly) url += `&distanceFromLocation=0`;
+
+    const credentials = Buffer.from(`${REED_API_KEY}:`).toString("base64");
+    const res = await fetch(url, {
+      headers: {
+        "Authorization": `Basic ${credentials}`,
+        "User-Agent": "Mozilla/5.0",
+      },
+    });
+    const json = await res.json();
+
+    return (json.results ?? []).map((job: any, i: number) => ({
+      id: `reed-${job.jobId ?? i}`,
+      title: job.jobTitle ?? "No title",
+      description: (job.jobDescription ?? job.snippet ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
+      url: job.jobUrl ?? "https://reed.co.uk",
+      postedAt: job.date ?? new Date().toISOString(),
+      company: job.employerName ?? "Unknown",
+      location: job.locationName ?? location,
+      source: "reed" as Source,
+      remote: job.jobTitle?.toLowerCase().includes("remote") || false,
+      salary: job.minimumSalary
+        ? `£${Math.round(job.minimumSalary / 1000)}k–£${Math.round(job.maximumSalary / 1000)}k`
+        : undefined,
+    }));
+  } catch (err: any) {
+    console.error("❌ Reed failed:", err.message);
+    return [];
+  }
+}
+
+// ── Jooble ────────────────────────────────────────────────────
+async function fetchJooble(keyword: string, location: string) {
+  try {
+    const res = await fetch(`https://jooble.org/api/${JOOBLE_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        keywords: keyword,
+        location: location || "",
+        page: 1,
+      }),
+    });
+    const json = await res.json();
+
+    return (json.jobs ?? []).slice(0, 20).map((job: any, i: number) => ({
+      id: `jooble-${job.id ?? i}`,
+      title: job.title ?? "No title",
+      description: (job.snippet ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
+      url: job.link ?? "https://jooble.org",
+      postedAt: job.updated ?? new Date().toISOString(),
+      company: job.company ?? "Unknown",
+      location: job.location ?? location,
+      source: "jooble" as Source,
+      remote: job.type?.toLowerCase().includes("remote") ||
+        job.title?.toLowerCase().includes("remote") || false,
+      salary: job.salary || undefined,
+    }));
+  } catch (err: any) {
+    console.error("❌ Jooble failed:", err.message);
+    return [];
+  }
+}
+
+// ── Greenhouse ────────────────────────────────────────────────
+async function fetchGreenhouse(keyword: string) {
+  // Greenhouse board tokens for well-known companies
+  const boards = [
+    "stripe", "airbnb", "figma", "notion", "vercel",
+    "linear", "supabase", "openai", "anthropic", "shopify",
+    "gitlab", "hashicorp", "confluent", "datadog", "mongodb",
+  ];
+
+  const kw = keyword.toLowerCase();
+  const results: any[] = [];
+
+  await Promise.all(
+    boards.map(async (board) => {
+      try {
+        const res = await fetch(
+          `https://boards-api.greenhouse.io/v1/boards/${board}/jobs?content=true`,
+          { headers: { "User-Agent": "Mozilla/5.0" } }
+        );
+        const json = await res.json();
+        const jobs = (json.jobs ?? []).filter((job: any) =>
+          `${job.title} ${job.content}`.toLowerCase().includes(kw)
+        );
+
+        jobs.slice(0, 3).forEach((job: any, i: number) => {
+          results.push({
+            id: `greenhouse-${board}-${job.id ?? i}`,
+            title: job.title ?? "No title",
+            description: (job.content ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
+            url: job.absolute_url ?? `https://boards.greenhouse.io/${board}`,
+            postedAt: job.updated_at ?? new Date().toISOString(),
+            company: board.charAt(0).toUpperCase() + board.slice(1),
+            location: job.location?.name ?? "Remote",
+            source: "greenhouse" as Source,
+            remote: job.location?.name?.toLowerCase().includes("remote") ||
+              job.title?.toLowerCase().includes("remote") || false,
+            salary: undefined,
+          });
+        });
+      } catch {
+        // silently skip boards that fail
+      }
+    })
+  );
+
+  return results;
+}
+
+// ── Remotive ──────────────────────────────────────────────────
 async function fetchRemotive(keyword: string) {
   try {
     const res = await fetch(
-      `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(keyword)}&limit=20`,
+      `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(keyword)}&limit=15`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
     const json = await res.json();
@@ -65,82 +185,14 @@ async function fetchRemotive(keyword: string) {
       postedAt: job.publication_date ?? new Date().toISOString(),
       company: job.company_name ?? "Unknown",
       location: job.candidate_required_location || "Worldwide",
-      source: "wellfound" as Source,
+      source: "remotive" as Source,
       remote: true,
       salary: job.salary || undefined,
     }));
   } catch { return []; }
 }
 
-async function fetchTheMuse(keyword: string, location: string) {
-  try {
-    let url = `https://www.themuse.com/api/public/jobs?query=${encodeURIComponent(keyword)}&page=1&descending=true`;
-    if (location) url += `&location=${encodeURIComponent(location)}`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const json = await res.json();
-    return (json.results ?? []).map((job: any, i: number) => {
-      const loc = job.locations?.[0]?.name ?? "Remote";
-      return {
-        id: `muse-${job.id ?? i}`,
-        title: job.name ?? "No title",
-        description: (job.contents ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
-        url: job.refs?.landing_page ?? "https://themuse.com",
-        postedAt: job.publication_date ?? new Date().toISOString(),
-        company: job.company?.name ?? "Unknown",
-        location: loc,
-        source: "linkedin" as Source,
-        remote: loc.toLowerCase().includes("remote") || loc.toLowerCase().includes("flexible"),
-      };
-    });
-  } catch { return []; }
-}
-
-async function fetchJobicy(keyword: string, location: string) {
-  try {
-    let url = `https://jobicy.com/api/v2/remote-jobs?count=20&tag=${encodeURIComponent(keyword)}`;
-    if (location) url += `&geo=${encodeURIComponent(location)}`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const json = await res.json();
-    return (json.jobs ?? []).map((job: any, i: number) => ({
-      id: `jobicy-${job.id ?? i}`,
-      title: job.jobTitle ?? "No title",
-      description: (job.jobDescription ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
-      url: job.url ?? "https://jobicy.com",
-      postedAt: job.pubDate ?? new Date().toISOString(),
-      company: job.companyName ?? "Unknown",
-      location: job.jobGeo ?? "Remote",
-      source: "jobberman" as Source,
-      remote: Array.isArray(job.jobType)
-        ? job.jobType.some((t: any) => t?.toLowerCase().includes("remote"))
-        : typeof job.jobType === "string"
-        ? job.jobType.toLowerCase().includes("remote")
-        : true,
-      salary: job.annualSalaryMin ? `$${job.annualSalaryMin}–$${job.annualSalaryMax}` : undefined,
-    }));
-  } catch { return []; }
-}
-
-async function fetchWorkingNomads(keyword: string) {
-  try {
-    const res = await fetch(
-      `https://www.workingnomads.com/api/exposed_jobs/?search=${encodeURIComponent(keyword)}`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
-    );
-    const json = await res.json();
-    return (json ?? []).slice(0, 15).map((job: any, i: number) => ({
-      id: `nomads-${job.id ?? i}`,
-      title: job.title ?? "No title",
-      description: (job.description ?? "").replace(/<[^>]+>/g, "").slice(0, 600).trim(),
-      url: job.url ?? "https://workingnomads.com",
-      postedAt: job.pub_date ?? new Date().toISOString(),
-      company: job.company_name ?? "Unknown",
-      location: job.region || "Worldwide",
-      source: "myjobmag" as Source,
-      remote: true,
-    }));
-  } catch { return []; }
-}
-
+// ── Deduplication ─────────────────────────────────────────────
 function deduplicate(listings: any[]) {
   const seen = new Set<string>();
   return listings.filter((job) => {
@@ -152,7 +204,6 @@ function deduplicate(listings: any[]) {
 }
 
 // ── Scoring ───────────────────────────────────────────────────
-
 async function scoreListing(
   listing: any,
   profile: SkillsProfile,
@@ -178,14 +229,10 @@ Location: ${listing.location}
 Remote: ${listing.remote}
 ${listing.salary ? `Salary: ${listing.salary}` : ""}
 Description: ${listing.description.slice(0, 300)}`,
-   `You are a job matching assistant. Return ONLY a JSON object with:
+      `You are a job matching assistant. Return ONLY a JSON object with:
 - score: number 0-100
 - rationale: string (1 sentence overall summary)
-- breakdown: object with these 4 keys:
-    - skillsMatch: string (1 sentence — how well skills align)
-    - experienceMatch: string (1 sentence — seniority and years fit)
-    - locationMatch: string (1 sentence — location and remote fit)
-    - roleMatch: string (1 sentence — how well the role type fits)
+- breakdown: object with keys skillsMatch, experienceMatch, locationMatch, roleMatch (each a 1 sentence string)
 - recommendation: "apply" | "borderline" | "skip"
 - confidence: "high" | "medium" | "low"
 - skills: string[] (up to 5 skills from the listing)
@@ -224,44 +271,59 @@ async function scoreInBatches(
 }
 
 // ── POST handler ──────────────────────────────────────────────
-
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     profile,
+    sources,
     location = "",
     remoteOnly = false,
-  }: { profile: SkillsProfile; location: string; remoteOnly: boolean } = body;
+  }: {
+    profile: SkillsProfile;
+    sources: Source[];
+    location: string;
+    remoteOnly: boolean;
+  } = body;
 
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
   }
 
   const keyword = profile.keywords[0] ?? "developer";
+  const activeSources = sources.length > 0 ? sources : ["adzuna", "reed", "jooble", "greenhouse", "remotive"];
 
-  // 1. Fetch all sources in parallel
-  const [arbeitnow, remotive, muse, jobicy, nomads] = await Promise.all([
-    fetchArbeitnow(keyword, remoteOnly, location),
-    fetchRemotive(keyword),
-    fetchTheMuse(keyword, location),
-    fetchJobicy(keyword, location),
-    fetchWorkingNomads(keyword),
-  ]);
+  // Fetch from selected sources in parallel
+  const fetchMap: Record<string, () => Promise<any[]>> = {
+    adzuna: () => fetchAdzuna(keyword, location, remoteOnly),
+    reed: () => fetchReed(keyword, location, remoteOnly),
+    jooble: () => fetchJooble(keyword, location),
+    greenhouse: () => fetchGreenhouse(keyword),
+    remotive: () => fetchRemotive(keyword),
+  };
 
-  let combined = deduplicate([...arbeitnow, ...remotive, ...muse, ...jobicy, ...nomads]);
+  const fetched = await Promise.all(
+    activeSources.map((s) => fetchMap[s]?.() ?? Promise.resolve([]))
+  );
 
-  // 2. Apply filters
-  if (remoteOnly) combined = combined.filter((j) => j.remote === true);
- if (location) {
+  const sourceStats: Partial<Record<Source, number>> = {};
+  activeSources.forEach((s, i) => {
+    sourceStats[s as Source] = fetched[i].length;
+  });
+
+  let combined = deduplicate(fetched.flat());
+
+  // Apply filters
+  if (remoteOnly) combined = combined.filter((j: any) => j.remote === true);
+  if (location) {
     const loc = location.toLowerCase();
     combined = combined.filter(
-      (j) => j.remote || j.location?.toLowerCase().includes(loc)
+      (j: any) => j.remote || j.location?.toLowerCase().includes(loc)
     );
   }
 
-  // 3. Pre-filter — skip obvious mismatches before calling Gemini
+  // Pre-filter by skill keywords
   const skillKeywords = profile.topSkills.map((s) => s.toLowerCase());
-  const preFiltered = combined.filter((job) => {
+  const preFiltered = combined.filter((job: any) => {
     const text = `${job.title} ${job.description}`.toLowerCase();
     return skillKeywords.some((skill) => text.includes(skill));
   });
@@ -271,26 +333,20 @@ export async function POST(req: NextRequest) {
   if (toScore.length === 0) {
     return NextResponse.json({
       results: [],
-      stats: { scanned: combined.length, scored: 0, passed: 0, sources: {} },
+      stats: { scanned: combined.length, scored: 0, passed: 0, sources: sourceStats },
     });
   }
 
-  // 4. Score in parallel batches of 5
   const scored = await scoreInBatches(toScore, 5, profile, remoteOnly, location);
   const sorted = scored.sort((a, b) => b.score - a.score);
 
-  const stats = {
-    scanned: combined.length,
-    scored: scored.length,
-    passed: sorted.filter((l) => l.score >= 65).length,
-    sources: {
-      arbeitnow: arbeitnow.length,
-      remotive: remotive.length,
-      themuse: muse.length,
-      jobicy: jobicy.length,
-      workingnomads: nomads.length,
+  return NextResponse.json({
+    results: sorted,
+    stats: {
+      scanned: combined.length,
+      scored: scored.length,
+      passed: sorted.filter((l) => l.score >= 65).length,
+      sources: sourceStats,
     },
-  };
-
-  return NextResponse.json({ results: sorted, stats });
+  });
 }
