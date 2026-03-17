@@ -192,6 +192,68 @@ async function fetchRemotive(keyword: string) {
   } catch { return []; }
 }
 
+async function fetchJobberman(keyword: string) {
+  try {
+    const res = await fetch(
+      `https://www.jobberman.com/jobs?q=${encodeURIComponent(keyword)}`,
+      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } }
+    );
+    const html = await res.text();
+    const blocks = [...html.matchAll(/<article[^>]*>([\s\S]*?)<\/article>/gi)];
+
+    return blocks.slice(0, 10).map((m, i) => {
+      const block = m[1];
+      const title = block.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "No title";
+      const company = block.match(/class="[^"]*company[^"]*"[^>]*>([\s\S]*?)<\//i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "Unknown";
+      const location = block.match(/class="[^"]*location[^"]*"[^>]*>([\s\S]*?)<\//i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "Nigeria";
+      const urlMatch = block.match(/href="([^"]*job[^"]*)"/i);
+      const url = urlMatch ? (urlMatch[1].startsWith("http") ? urlMatch[1] : `https://www.jobberman.com${urlMatch[1]}`) : "https://www.jobberman.com";
+      return { id: `jobberman-${i}`, title, description: `${title} at ${company}. ${location}.`, url, postedAt: new Date().toISOString(), company, location, source: "jobberman" as Source, remote: location.toLowerCase().includes("remote") };
+    }).filter(j => j.title !== "No title" && j.title.length > 3);
+  } catch { return []; }
+}
+
+async function fetchHotNigeriaJobs(keyword: string) {
+  try {
+    const res = await fetch(
+      `https://www.hotnigerianjobs.com/hotjobs/?q=${encodeURIComponent(keyword)}`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    const html = await res.text();
+    const blocks = [...html.matchAll(/<div[^>]*class="[^"]*job[-_]?item[^"]*"[^>]*>([\s\S]*?)<\/div>/gi)];
+
+    return blocks.slice(0, 10).map((m, i) => {
+      const block = m[1];
+      const titleMatch = block.match(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
+      const title = titleMatch?.[2]?.replace(/<[^>]+>/g, "").trim() ?? "No title";
+      const url = titleMatch ? (titleMatch[1].startsWith("http") ? titleMatch[1] : `https://www.hotnigerianjobs.com${titleMatch[1]}`) : "https://www.hotnigerianjobs.com";
+      return { id: `hotnigeriajobs-${i}`, title, description: `${title} position in Nigeria.`, url, postedAt: new Date().toISOString(), company: "Nigerian Employer", location: "Nigeria", source: "hotnigeriajobs" as Source, remote: false };
+    }).filter(j => j.title !== "No title" && j.title.length > 3);
+  } catch { return []; }
+}
+
+
+async function fetchMyJobMag(keyword: string) {
+  try {
+    const res = await fetch(
+      `https://www.myjobmag.com/jobs/${encodeURIComponent(keyword.replace(/\s+/g, "-"))}`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    const html = await res.text();
+    const blocks = [...html.matchAll(/<li[^>]*class="[^"]*job[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)];
+
+    return blocks.slice(0, 10).map((m, i) => {
+      const block = m[1];
+      const titleMatch = block.match(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
+      const title = titleMatch?.[2]?.replace(/<[^>]+>/g, "").trim() ?? "No title";
+      const url = titleMatch ? (titleMatch[1].startsWith("http") ? titleMatch[1] : `https://www.myjobmag.com${titleMatch[1]}`) : "https://www.myjobmag.com";
+      const company = block.match(/class="[^"]*company[^"]*"[^>]*>([\s\S]*?)<\//i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "Unknown";
+      const location = block.match(/class="[^"]*location[^"]*"[^>]*>([\s\S]*?)<\//i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "Nigeria";
+      return { id: `myjobmag-${i}`, title, description: `${title} at ${company}. ${location}.`, url, postedAt: new Date().toISOString(), company, location, source: "myjobmag" as Source, remote: location.toLowerCase().includes("remote") };
+    }).filter(j => j.title !== "No title" && j.title.length > 3);
+  } catch { return []; }
+}
+
 // ── Deduplication ─────────────────────────────────────────────
 function deduplicate(listings: any[]) {
   const seen = new Set<string>();
@@ -293,13 +355,16 @@ export async function POST(req: NextRequest) {
   const activeSources = sources.length > 0 ? sources : ["adzuna", "reed", "jooble", "greenhouse", "remotive"];
 
   // Fetch from selected sources in parallel
-  const fetchMap: Record<string, () => Promise<any[]>> = {
-    adzuna: () => fetchAdzuna(keyword, location, remoteOnly),
-    reed: () => fetchReed(keyword, location, remoteOnly),
-    jooble: () => fetchJooble(keyword, location),
-    greenhouse: () => fetchGreenhouse(keyword),
-    remotive: () => fetchRemotive(keyword),
-  };
+const fetchMap: Record<string, () => Promise<any[]>> = {
+  adzuna: () => fetchAdzuna(keyword, location, remoteOnly),
+  reed: () => fetchReed(keyword, location, remoteOnly),
+  jooble: () => fetchJooble(keyword, location),
+  greenhouse: () => fetchGreenhouse(keyword),
+  remotive: () => fetchRemotive(keyword),
+  jobberman: () => fetchJobberman(keyword),
+  hotnigeriajobs: () => fetchHotNigeriaJobs(keyword),
+  myjobmag: () => fetchMyJobMag(keyword),
+};
 
   const fetched = await Promise.all(
     activeSources.map((s) => fetchMap[s]?.() ?? Promise.resolve([]))

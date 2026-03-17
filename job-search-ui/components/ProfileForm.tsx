@@ -16,7 +16,7 @@ const DEFAULT_PROFILE: SkillsProfile = {
   keywords: [],
 };
 
-const ALL_SOURCES: Source[] = ["adzuna", "reed", "jooble", "greenhouse", "remotive"];
+const ALL_SOURCES: Source[] = ["adzuna", "reed", "jooble", "greenhouse", "remotive", "jobberman", "hotnigeriajobs", "myjobmag"];
 
 interface ProfileFormProps {
   onSearch: (profile: SkillsProfile, sources: Source[]) => void;
@@ -184,40 +184,56 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
 
 
       {/* Sources */}
+      {/* Sources */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
           Sources to scan
         </label>
+
+        {/* Global sources */}
+        <p className="text-[10px] text-zinc-400 uppercase tracking-wide font-medium">🌍 Global</p>
         <div className="space-y-2">
-          {ALL_SOURCES.map((s) => {
-            const active = sources.includes(s);
-            const meta = SOURCE_META[s];
+          {([
+            { key: "adzuna",     label: "Adzuna",      desc: "Global · Nigeria + 20 countries",   color: "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30",    text: "text-blue-700 dark:text-blue-300" },
+            { key: "reed",       label: "Reed",         desc: "UK's largest · 130k+ live jobs",    color: "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30",       text: "text-red-700 dark:text-red-300" },
+            { key: "jooble",     label: "Jooble",       desc: "Aggregates 140k+ sources globally", color: "border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-300" },
+            { key: "greenhouse", label: "Greenhouse",   desc: "Direct from top tech companies",    color: "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-300" },
+            { key: "remotive",   label: "Remotive",     desc: "Curated remote jobs only",          color: "border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-300" },
+          ] as const).map((s) => {
+            const active = sources.includes(s.key as Source);
             return (
-              <div
-                key={s}
-                onClick={() => toggleSource(s)}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
-                  active
-                    ? `${meta.bg} border-current ${meta.color}`
-                    : "border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 opacity-50"
-                }`}
-              >
+              <div key={s.key} onClick={() => toggleSource(s.key as Source)}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${active ? s.color : "border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 opacity-50"}`}>
                 <div>
-                  <p className={`text-xs font-semibold ${active ? meta.color : "text-zinc-500 dark:text-zinc-400"}`}>
-                    {meta.label}
-                  </p>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{meta.description}</p>
+                  <p className={`text-xs font-semibold ${active ? s.text : "text-zinc-500 dark:text-zinc-400"}`}>{s.label}</p>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{s.desc}</p>
                 </div>
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                  active
-                    ? "border-zinc-900 dark:border-zinc-100 bg-zinc-900 dark:bg-zinc-100"
-                    : "border-zinc-300 dark:border-zinc-600"
-                }`}>
-                  {active && (
-                    <svg className="w-2.5 h-2.5 text-white dark:text-zinc-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? "border-zinc-900 dark:border-zinc-100 bg-zinc-900 dark:bg-zinc-100" : "border-zinc-300 dark:border-zinc-600"}`}>
+                  {active && <svg className="w-2.5 h-2.5 text-white dark:text-zinc-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Nigerian sources */}
+        <p className="text-[10px] text-zinc-400 uppercase tracking-wide font-medium pt-1">🇳🇬 Nigeria</p>
+        <div className="space-y-2">
+          {([
+            { key: "jobberman",     label: "Jobberman",      desc: "Nigeria's largest job board",        color: "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30",   text: "text-green-700 dark:text-green-300" },
+            { key: "hotnigeriajobs", label: "HotNigeriaJobs", desc: "Aggregates Nigerian listings",       color: "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30", text: "text-yellow-700 dark:text-yellow-300" },
+            { key: "myjobmag",      label: "MyJobMag",        desc: "Nigeria, Ghana & Kenya roles",       color: "border-lime-200 dark:border-lime-800 bg-lime-50 dark:bg-lime-950/30",     text: "text-lime-700 dark:text-lime-300" },
+          ] as const).map((s) => {
+            const active = sources.includes(s.key as Source);
+            return (
+              <div key={s.key} onClick={() => toggleSource(s.key as Source)}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${active ? s.color : "border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 opacity-50"}`}>
+                <div>
+                  <p className={`text-xs font-semibold ${active ? s.text : "text-zinc-500 dark:text-zinc-400"}`}>{s.label}</p>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{s.desc}</p>
+                </div>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? "border-zinc-900 dark:border-zinc-100 bg-zinc-900 dark:bg-zinc-100" : "border-zinc-300 dark:border-zinc-600"}`}>
+                  {active && <svg className="w-2.5 h-2.5 text-white dark:text-zinc-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                 </div>
               </div>
             );

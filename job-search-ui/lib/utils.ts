@@ -91,6 +91,27 @@ export const SOURCE_META: Record<Source, {
     bg: "bg-teal-100 dark:bg-teal-900/40",
     badge: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200",
     description: "Remote-only · curated for nomads",
+    },
+  jobberman: {
+    label: "Jobberman",
+    color: "text-green-800 dark:text-green-200",
+    bg: "bg-green-100 dark:bg-green-900/40",
+    badge: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200",
+    description: "Nigeria's largest job board",
+  },
+  hotnigeriajobs: {
+    label: "HotNigeriaJobs",
+    color: "text-yellow-800 dark:text-yellow-200",
+    bg: "bg-yellow-100 dark:bg-yellow-900/40",
+    badge: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200",
+    description: "Aggregates Nigerian job listings",
+  },
+  myjobmag: {
+    label: "MyJobMag",
+    color: "text-lime-800 dark:text-lime-200",
+    bg: "bg-lime-100 dark:bg-lime-900/40",
+    badge: "bg-lime-100 text-lime-800 dark:bg-lime-900/40 dark:text-lime-200",
+    description: "Nigeria, Ghana & Kenya roles",
   },
 };
 

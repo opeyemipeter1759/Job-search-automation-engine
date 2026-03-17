@@ -1,6 +1,6 @@
 export type Recommendation = "apply" | "borderline" | "skip";
 export type Confidence = "high" | "medium" | "low";
-export type Source = "adzuna" | "reed" | "jooble" | "greenhouse" | "remotive" | "arbeitnow" | "themuse" | "workingnomads";
+export type Source = "adzuna" | "reed" | "jooble" | "greenhouse" | "remotive" | "arbeitnow" | "themuse" | "workingnomads" | "jobberman" | "hotnigeriajobs" | "myjobmag";
 
 
 export interface SkillsProfile {
@@ -71,3 +71,5 @@ export interface ParsedResume {
   dealbreakers: string[];
   keywords: string[];
 }
+
+
