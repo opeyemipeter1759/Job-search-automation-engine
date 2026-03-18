@@ -292,13 +292,15 @@ Remote: ${listing.remote}
 ${listing.salary ? `Salary: ${listing.salary}` : ""}
 Description: ${listing.description.slice(0, 300)}`,
       `You are a job matching assistant. Return ONLY a JSON object with:
-- score: number 0-100
-- rationale: string (1 sentence overall summary)
-- breakdown: object with keys skillsMatch, experienceMatch, locationMatch, roleMatch (each a 1 sentence string)
+- score: number 0-100 (0-20 if the job is completely unrelated to the candidate's field)
+- rationale: string (1 sentence — be honest if it is a poor match)
+- breakdown: object with keys skillsMatch, experienceMatch, locationMatch, roleMatch, cultureAndGrowth (each a 1 sentence string)
 - recommendation: "apply" | "borderline" | "skip"
 - confidence: "high" | "medium" | "low"
 - skills: string[] (up to 5 skills from the listing)
-- corrected: false`
+- corrected: false
+
+CRITICAL: If the job is in a completely different field from the candidate (e.g. candidate is an accountant but job is software engineering), give a score of 5 or less and recommend "skip". Do not force a match that does not exist. Always score based on the candidate's ACTUAL profession and skills.`
     );
     return { ...listing, ...JSON.parse(raw) };
   } catch {
@@ -363,7 +365,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
   }
 
-  const keyword = profile.keywords[0] ?? "developer";
+ const keyword =
+  profile.keywords?.[0] ||
+  profile.preferredRoles?.[0] ||
+  profile.topSkills?.[0] ||
+  "professional";
   const activeSources = sources?.length > 0 ? sources : ["greenhouse", "remotive"];
 
   const fetchMap: Record<string, () => Promise<any[]>> = {
@@ -396,13 +402,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const skillKeywords = profile.topSkills.map((s: string) => s.toLowerCase());
-  const preFiltered = combined.filter((job: any) => {
-    const text = `${job.title} ${job.description}`.toLowerCase();
-    return skillKeywords.some((skill: string) => text.includes(skill));
-  });
+// Filter by role keywords only — not skills (skills are too specific)
+const roleKeywords = [
+  ...(profile.preferredRoles ?? []),
+  ...(profile.keywords ?? []),
+].map((s: string) => s.toLowerCase());
 
-  const toScore = (preFiltered.length > 0 ? preFiltered : combined).slice(0, 10);
+const preFiltered = roleKeywords.length > 0
+  ? combined.filter((job: any) => {
+      const text = `${job.title} ${job.description}`.toLowerCase();
+      return roleKeywords.some((kw: string) => text.includes(kw));
+    })
+  : combined;
+
+const toScore = (preFiltered.length > 0 ? preFiltered : combined).slice(0, 10);
 
   if (toScore.length === 0) {
     return NextResponse.json({

@@ -64,6 +64,13 @@ export function ProfileForm({ onSearch, loading }: ProfileFormProps) {
   const [sources, setSources] = useState<Source[]>(ALL_SOURCES);
 
     function handleResumeParsed(parsed: ParsedResume) {
+
+         console.log("📄 Parsed CV data:", parsed);
+  
+  if (!parsed || Object.keys(parsed).length === 0) {
+    alert("CV was uploaded but no data could be extracted. Try a different file.");
+    return;
+  }
   setProfile({
     name: parsed.name || "",
     topSkills: parsed.topSkills || [],

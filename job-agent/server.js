@@ -91,7 +91,11 @@ app.post( "/api/search", async ( req, res ) =>
             return res.status( 400 ).json( { error: "Profile with skills is required" } );
         }
 
-        const keyword = profile.keywords?.[0] ?? profile.preferredRoles?.[0] ?? "developer";
+        const keyword =
+            profile.keywords?.[0] ||
+            profile.preferredRoles?.[0] ||
+            profile.topSkills?.[0] ||
+            "professional";
         const includeNigeria = sources.includes( "jobberman" ) ||
             sources.includes( "hotnigeriajobs" ) ||
             sources.includes( "myjobmag" );
