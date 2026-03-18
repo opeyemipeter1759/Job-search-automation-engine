@@ -2,7 +2,9 @@ require( "dotenv" ).config();
 const { GoogleGenerativeAI } = require( "@google/generative-ai" );
 const { fetchUpworkJobs } = require( "./fetchUpworkJobs" );
 const { fetchJobberman, fetchHotNigeriaJobs, fetchMyJobMag } = require( "./fetchNigerianJobs" );
-const { MY_PROFILE } = require( "./skills-profile" );
+// const { MY_PROFILE } = require( "./skills-profile" );
+delete require.cache[require.resolve( "./skills-profile" )];
+
 const fs = require( "fs" );
 const path = require( "path" );
 
@@ -143,6 +145,8 @@ function saveResults( shortlist, stats )
 // ── Main ──────────────────────────────────────────────────────
 async function main()
 {
+    delete require.cache[require.resolve( "./skills-profile" )];
+    const { MY_PROFILE } = require( "./skills-profile" );
     const keyword = process.argv[2] ?? MY_PROFILE.keywords[0];
     const remoteOnly = process.argv[3] === "--remote";
     const location = process.argv[4] ?? MY_PROFILE.preferredLocations[0] ?? "";

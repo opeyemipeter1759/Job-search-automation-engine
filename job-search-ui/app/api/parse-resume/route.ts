@@ -56,6 +56,19 @@ export async function POST(req: NextRequest) {
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
     const parsed = JSON.parse(raw);
 
+// Save parsed profile to a shared file job-agent can read
+    const fs = await import("fs");
+    const path = await import("path");
+    const profilePath = path.join(process.cwd(), "..", "job-agent", "parsed-profile.json");
+    
+    try {
+      fs.writeFileSync(profilePath, JSON.stringify(parsed, null, 2));
+      console.log("✅ Profile saved to job-agent/parsed-profile.json");
+    } catch {
+      // Don't fail if write fails — frontend still works
+      console.warn("⚠️ Could not save profile to job-agent folder");
+    }
+
     return NextResponse.json({ profile: parsed });
   } catch (err: any) {
     console.error("Resume parse failed:", err.message);

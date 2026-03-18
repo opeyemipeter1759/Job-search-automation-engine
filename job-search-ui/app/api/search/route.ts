@@ -335,36 +335,47 @@ async function scoreInBatches(
 // ── POST handler ──────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const {
-    profile,
-    sources,
-    location = "",
-    remoteOnly = false,
-  }: {
-    profile: SkillsProfile;
-    sources: Source[];
-    location: string;
-    remoteOnly: boolean;
-  } = body;
+  const { profile, sources, location = "", remoteOnly = false } = body;
 
+  const AGENT_URL = process.env.AGENT_API_URL;
+
+  // ── If agent server is running, use it ───────────────────────
+  if (AGENT_URL) {
+    try {
+      const res = await fetch(`${AGENT_URL}/api/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, sources, location, remoteOnly }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data);
+      }
+    } catch (err) {
+      console.warn("Agent server unavailable, falling back to built-in scrapers");
+    }
+  }
+
+  // ── Fallback — built-in scrapers in route.ts ─────────────────
+  // (keep all the existing scraper code here as fallback)
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
   }
 
   const keyword = profile.keywords[0] ?? "developer";
-  const activeSources = sources.length > 0 ? sources : ["adzuna", "reed", "jooble", "greenhouse", "remotive"];
+  const activeSources = sources?.length > 0 ? sources : ["greenhouse", "remotive"];
 
-  // Fetch from selected sources in parallel
-const fetchMap: Record<string, () => Promise<any[]>> = {
-  adzuna: () => fetchAdzuna(keyword, location, remoteOnly),
-  reed: () => fetchReed(keyword, location, remoteOnly),
-  jooble: () => fetchJooble(keyword, location),
-  greenhouse: () => fetchGreenhouse(keyword),
-  remotive: () => fetchRemotive(keyword),
-  jobberman: () => fetchJobberman(keyword),
-  hotnigeriajobs: () => fetchHotNigeriaJobs(keyword),
-  myjobmag: () => fetchMyJobMag(keyword),
-};
+  const fetchMap: Record<string, () => Promise<any[]>> = {
+    adzuna: () => fetchAdzuna(keyword, location, remoteOnly),
+    reed: () => fetchReed(keyword, location, remoteOnly),
+    jooble: () => fetchJooble(keyword, location),
+    greenhouse: () => fetchGreenhouse(keyword),
+    remotive: () => fetchRemotive(keyword),
+    jobberman: () => fetchJobberman(keyword),
+    hotnigeriajobs: () => fetchHotNigeriaJobs(keyword),
+    myjobmag: () => fetchMyJobMag(keyword),
+  };
 
   const fetched = await Promise.all(
     activeSources.map((s) => fetchMap[s]?.() ?? Promise.resolve([]))
@@ -377,7 +388,6 @@ const fetchMap: Record<string, () => Promise<any[]>> = {
 
   let combined = deduplicate(fetched.flat());
 
-  // Apply filters
   if (remoteOnly) combined = combined.filter((j: any) => j.remote === true);
   if (location) {
     const loc = location.toLowerCase();
@@ -386,11 +396,10 @@ const fetchMap: Record<string, () => Promise<any[]>> = {
     );
   }
 
-  // Pre-filter by skill keywords
-  const skillKeywords = profile.topSkills.map((s) => s.toLowerCase());
+  const skillKeywords = profile.topSkills.map((s: string) => s.toLowerCase());
   const preFiltered = combined.filter((job: any) => {
     const text = `${job.title} ${job.description}`.toLowerCase();
-    return skillKeywords.some((skill) => text.includes(skill));
+    return skillKeywords.some((skill: string) => text.includes(skill));
   });
 
   const toScore = (preFiltered.length > 0 ? preFiltered : combined).slice(0, 10);
@@ -403,14 +412,14 @@ const fetchMap: Record<string, () => Promise<any[]>> = {
   }
 
   const scored = await scoreInBatches(toScore, 5, profile, remoteOnly, location);
-  const sorted = scored.sort((a, b) => b.score - a.score);
+  const sorted = scored.sort((a: any, b: any) => b.score - a.score);
 
   return NextResponse.json({
     results: sorted,
     stats: {
       scanned: combined.length,
       scored: scored.length,
-      passed: sorted.filter((l) => l.score >= 65).length,
+      passed: sorted.filter((l: any) => l.score >= 65).length,
       sources: sourceStats,
     },
   });
