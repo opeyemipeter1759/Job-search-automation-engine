@@ -27,16 +27,23 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         systemInstruction: {
           parts: [{
-            text: `You are a resume parser. Extract structured information and return ONLY a valid JSON object with these exact fields:
+              text:
+         `You are a resume parser. Extract structured information and return ONLY a valid JSON object with these exact fields:
 - name: string (full name)
-- topSkills: string[] (top 8 skills from the CV — be specific to their field)
+- topSkills: string[] (top 8 skills from the CV — specific to their field)
 - yearsExperience: number (total years of work experience)
-- preferredRoles: string[] (3-5 exact job titles that match their background)
-- keywords: string[] (4-6 short search keywords — must match their ACTUAL field)
+- preferredRoles: string[] (3-5 exact job titles matching their background e.g. "Accountant", "Finance Manager", "Cost Controller")
+- keywords: string[] (4-6 SHORT single-word or two-word search terms for job boards e.g. ["accountant", "finance", "auditor"] NOT ["Accounting Operations", "Financial Reporting"] — these must work as job board search queries)
 - summary: string (2 sentence professional summary)
 - dealbreakers: string[]
 
-IMPORTANT: keywords and preferredRoles must reflect the candidate's ACTUAL profession. Never default to tech roles unless the CV is a tech CV.`
+CRITICAL RULES:
+1. keywords must be SHORT (1-2 words max) and work as job board search terms
+2. keywords and preferredRoles must reflect the candidate's ACTUAL profession
+3. For an accounting CV use keywords like: ["accountant", "finance", "audit", "bookkeeper"]
+4. For a tech CV use keywords like: ["developer", "engineer", "backend", "fullstack"]
+5. NEVER use long phrases as keywords`
+              
           }]
         },
         contents: [{

@@ -365,11 +365,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
   }
 
- const keyword =
+// Use shortest keyword that's 1-2 words, fall back to first preferred role
+const rawKeyword =
+  profile.keywords?.find((k: string) => k.split(" ").length <= 2) ||
   profile.keywords?.[0] ||
   profile.preferredRoles?.[0] ||
-  profile.topSkills?.[0] ||
   "professional";
+
+// Clean it up — lowercase, max 2 words
+    const keyword = rawKeyword.toLowerCase().split( " " ).slice( 0, 2 ).join( " " );
   const activeSources = sources?.length > 0 ? sources : ["greenhouse", "remotive"];
 
   const fetchMap: Record<string, () => Promise<any[]>> = {
@@ -384,7 +388,8 @@ export async function POST(req: NextRequest) {
   };
 
   const fetched = await Promise.all(
-    activeSources.map((s) => fetchMap[s]?.() ?? Promise.resolve([]))
+      activeSources.map((s: string) => fetchMap[s]?.() ?? Promise.resolve([]))
+
   );
 
   const sourceStats: Partial<Record<Source, number>> = {};
